@@ -1,0 +1,52 @@
+# CI di gokit: test (con race detector e MongoDB reale per mongox), gofmt e vet bloccanti.
+
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports: ["27017:27017"]
+    env:
+      MONGOX_TEST_URI: mongodb://localhost:27017
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Moduli coerenti (go mod tidy)
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Formattazione (gofmt)
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then echo "::error::File da formattare con gofmt:"; echo "$files"; exit 1; fi
+
+      - name: Vet
+        run: go vet ./...
