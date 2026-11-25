@@ -21,6 +21,9 @@ type CORSOptions struct {
 	AllowCredentials bool
 	// MaxAge in secondi per la cache del preflight (0 = non inviato).
 	MaxAge int
+	// RejectDisallowedPreflight risponde 403 ai preflight da origini non ammesse
+	// (default: 204 senza header CORS, che il browser tratta comunque come rifiuto).
+	RejectDisallowedPreflight bool
 }
 
 // CORS gestisce le richieste cross-origin. Con una lista di origini rimanda
@@ -76,6 +79,12 @@ func CORS(o CORSOptions) func(http.Handler) http.Handler {
 				}
 			}
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+				if !ok && origin != "" && o.RejectDisallowedPreflight {
+					w.Header().Set("Content-Type", "application/json; charset=utf-8")
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"error":"origine non consentita"}` + "\n"))
+					return
+				}
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}

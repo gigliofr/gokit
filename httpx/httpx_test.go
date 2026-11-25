@@ -79,9 +79,14 @@ func TestBearerAndClientIP(t *testing.T) {
 	if ClientIP(r, false) != "10.0.0.1" {
 		t.Fatal("senza trustProxy deve usare RemoteAddr")
 	}
-	if ClientIP(r, true) != "203.0.113.9" {
-		t.Fatalf("XFF: %s", ClientIP(r, true))
+	if ClientIP(r, true) != "10.0.0.2" {
+		t.Fatalf("XFF deve usare l'ultimo IP (aggiunto dal proxy): %s", ClientIP(r, true))
 	}
+	r.Header.Set("CF-Connecting-IP", "203.0.113.50")
+	if ClientIP(r, true) != "203.0.113.50" {
+		t.Fatal("CF-Connecting-IP ha la precedenza")
+	}
+	r.Header.Del("CF-Connecting-IP")
 	r.Header.Del("X-Forwarded-For")
 	r.Header.Set("X-Real-IP", "198.51.100.1")
 	if ClientIP(r, true) != "198.51.100.1" {

@@ -7,6 +7,8 @@
 //   - envx:   lettura di variabili d'ambiente tipizzate e file .env
 //   - mongox: connessione MongoDB con ping, timeout e creazione indici
 //   - httpx:  risposte/decodifica JSON, IP client, avvio server con graceful shutdown
-//   - mw:     middleware HTTP (header di sicurezza, CORS, rate limit)
+//   - mw:     middleware HTTP (header di sicurezza, CORS, rate limit, IP reale, recover)
 //   - authx:  JWT access/refresh, hash password bcrypt, token casuali
+//   - mailx:  email via Resend o SMTP
+//   - notifyx: Telegram e avvisi operativi
 package gokit

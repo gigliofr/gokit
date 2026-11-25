@@ -150,3 +150,43 @@ func TestLimiterConcurrent(t *testing.T) {
 		t.Fatalf("consentite %d, attese ~1000", allowed)
 	}
 }
+
+func TestRecover(t *testing.T) {
+	var gotPath string
+	h := Recover(func(r *http.Request, v any, stack []byte) { gotPath = r.URL.Path })(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("boom")
+	}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/x", nil))
+	if rec.Code != 500 || gotPath != "/x" {
+		t.Fatalf("%d %q", rec.Code, gotPath)
+	}
+	defer func() {
+		if recover() != http.ErrAbortHandler {
+			t.Fatal("ErrAbortHandler va propagato")
+		}
+	}()
+	Recover()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic(http.ErrAbortHandler) })).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+}
+
+func TestRealIPAndRejectPreflight(t *testing.T) {
+	var seen string
+	h := RealIP(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { seen = r.RemoteAddr }))
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "10.0.0.1:5555"
+	r.Header.Set("X-Forwarded-For", "6.6.6.6, 198.51.100.7")
+	h.ServeHTTP(httptest.NewRecorder(), r)
+	if seen != "198.51.100.7:0" {
+		t.Fatalf("RemoteAddr = %s", seen)
+	}
+
+	c := CORS(CORSOptions{AllowedOrigins: []string{"https://ok.test"}, RejectDisallowedPreflight: true})(ok)
+	r = httptest.NewRequest("OPTIONS", "/", nil)
+	r.Header.Set("Origin", "https://evil.test")
+	r.Header.Set("Access-Control-Request-Method", "POST")
+	rec := httptest.NewRecorder()
+	c.ServeHTTP(rec, r)
+	if rec.Code != 403 {
+		t.Fatalf("preflight non ammesso: %d", rec.Code)
+	}
+}
