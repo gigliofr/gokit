@@ -11,4 +11,6 @@
 //   - authx:  JWT access/refresh, hash password bcrypt, token casuali
 //   - mailx:  email via Resend o SMTP
 //   - notifyx: Telegram e avvisi operativi
+//   - storagex: file locali con nomi sicuri e scrittura atomica
+//     (il modulo separato storagex/s3 firma gli URL S3/MinIO)
 package gokit

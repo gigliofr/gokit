@@ -50,3 +50,28 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+  s3:
+    name: storagex/s3 (modulo separato, Go 1.23)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: storagex/s3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: storagex/s3/go.mod
+          cache-dependency-path: storagex/s3/go.sum
+
+      - name: Moduli coerenti (go mod tidy)
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Vet
+        run: go vet ./...

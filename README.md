@@ -4,7 +4,7 @@ Librerie Go condivise dai progetti **heroquest-studio**, **mana-wise**, **qr-men
 Raccolgono le logiche che finora erano state riscritte, con piccole differenze, in ogni progetto.
 
 ```
-go get github.com/gigliofr/gokit@v0.2.0
+go get github.com/gigliofr/gokit@v0.3.0
 ```
 
 Ogni sottopackage è indipendente: si importa solo ciò che serve e si compilano solo le relative dipendenze.
@@ -18,6 +18,9 @@ Ogni sottopackage è indipendente: si importa solo ciò che serve e si compilano
 | `authx`  | `TokenManager` generico JWT HS256 access/refresh (verifica algoritmo, scadenza, issuer, tipo; `jti` sui refresh), `HashPassword`, `CheckPassword`, `SecureToken` | i 3 `TokenManager` e gli helper bcrypt |
 | `mailx`  | `Sender` con `Resend` (API HTTP, senza SDK), `SMTP` (STARTTLS o TLS su 465, header anti-injection, Message-ID), `Noop`, `Log`; `FromEnv` sceglie il provider | i 3 client SMTP e l'SDK Resend |
 | `notifyx`| `Telegram`, `Multi`, `Ops` (avvisi operativi: avvio, arresto, errori, panic, `Watch` sulle dipendenze, con deduplica) | il client Telegram di quota-zero; avvisi prima assenti |
+| `storagex` | interfaccia `Storage`, `Local` (scrittura atomica, limite dimensione, estensioni ammesse), `Policy.SafeName`, `ValidKey`, `NewKey`, `ExtFromMIME` | `localfs` di heroquest-studio e `LocalStorage` di quota-zero |
+| `authx/totp` | `Generate`, `Validate`, `Code` (RFC 6238, compatibile con le app di autenticazione) | `auth/totp.go` di visto-easy |
+| `storagex/s3` | **modulo separato** (richiede Go 1.23): `Presigner` per URL firmati di upload/download su S3/MinIO, `ConfigFromEnv`, `Key`, `SafeFileName` | `storage/presign.go` di visto-easy |
 
 ## Esempi
 
@@ -89,6 +92,30 @@ dentro l'app (Mongo giù, panic, riavvii). Le variabili `OPS_*` sono separate da
 Per creare il bot: @BotFather → `/newbot` → token; aggiungi il bot alla chat o al gruppo,
 scrivi un messaggio e leggi il `chat.id` da `https://api.telegram.org/bot<TOKEN>/getUpdates`.
 
+## File
+
+```go
+files, err := storagex.NewLocal(envx.String("STORAGE_PATH", "./data"), storagex.Policy{
+	AllowedExt: []string{".png", ".jpg", ".pdf"},
+	MaxBytes:   15 << 20,
+})
+name, err := files.Policy().SafeName(header.Filename) // "../Foto Casa.JPG" -> "Foto_Casa.jpg"
+obj, err := files.Put(ctx, storagex.NewKey(filepath.Ext(name)), r)
+rc, err := files.Open(ctx, obj.Key) // storagex.ErrNotFound se manca
+```
+
+Per S3/MinIO (`go get github.com/gigliofr/gokit/storagex/s3@v0.1.0`):
+
+```go
+cfg, ok := s3.ConfigFromEnv() // S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_REGION, S3_USE_SSL
+p, err := s3.New(cfg)
+uploadURL, exp, err := p.PresignPut(ctx, s3.Key("pratiche", id, "documenti", nomeFile))
+```
+
+`storagex/s3` è un modulo a sé perché minio-go richiede Go 1.23: i progetti ancora su
+Go 1.22 (heroquest-studio, mana-wise) possono aggiornare gokit senza cambiare toolchain.
+I suoi tag hanno il prefisso della cartella: `storagex/s3/v0.1.0`.
+
 ## IP del client dietro proxy
 
 `httpx.ClientIP(r, true)` e `mw.RealIP` usano `CF-Connecting-IP` (Cloudflare) e poi
@@ -108,16 +135,16 @@ Versioni: semver con tag `vX.Y.Z`. Fino a `v1` le API possono cambiare tra versi
 
 | Progetto | Package usati |
 |----------|---------------|
-| quota-zero | tutti |
-| visto-easy | authx, envx, httpx, mailx, mongox, mw, notifyx |
-| heroquest-studio | envx, httpx, mongox, mw, notifyx |
+| quota-zero | tutti tranne authx/totp e storagex/s3 |
+| visto-easy | authx, authx/totp, envx, httpx, mailx, mongox, mw, notifyx, storagex/s3 |
+| heroquest-studio | envx, httpx, mongox, mw, notifyx, storagex |
 | mana-wise | mailx, mongox, mw (RealIP), notifyx — JWT e formato errori restano propri (contratto API) |
 | qr-menu | httpx, mongox, notifyx |
 
-Prossimi package previsti: `storagex` (file locali e S3/MinIO), `authx/totp`.
 
 ## Versioni
 
+- **v0.3.0** (+ `storagex/s3/v0.1.0`): `storagex`, `authx/totp`, modulo `storagex/s3`.
 - **v0.2.0**: `mailx`, `notifyx`, `mw.RealIP`, `mw.Recover`, `CORSOptions.RejectDisallowedPreflight`;
   `httpx.ClientIP` usa l'ultimo X-Forwarded-For (prima il primo, falsificabile);
   `httpx.NewServer` senza `ReadTimeout` (upload lenti); go.sum ripulito.
