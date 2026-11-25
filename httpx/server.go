@@ -8,14 +8,14 @@ import (
 )
 
 // NewServer crea un http.Server con timeout prudenti:
-// ReadHeaderTimeout 10s (protegge da slowloris), ReadTimeout 60s, IdleTimeout 120s.
-// WriteTimeout resta 0 per non interrompere SSE e download lunghi.
+// ReadHeaderTimeout 10s (protegge da slowloris) e IdleTimeout 120s.
+// ReadTimeout e WriteTimeout restano 0 per non interrompere upload lenti,
+// SSE e download lunghi: limitare il body con httpx.Decode o http.MaxBytesReader.
 func NewServer(addr string, h http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              addr,
 		Handler:           h,
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
